@@ -13,7 +13,7 @@ namespace = {"kml": "http://www.opengis.net/kml/2.2"}
 def clean_layer_name(name):
     return re.sub(r'[^a-zA-Z0-9_-]', '_', name)
 
-# Extraction des placemarks groupés par le dernier dossier parent
+# Extraction des placemarks groupés par dossier parent du dossier parent
 def extract_grouped_placemarks(folder_elem, path):
     placemark_dict = {}
 
@@ -25,15 +25,15 @@ def extract_grouped_placemarks(folder_elem, path):
         placemark_name_elem = placemark.find("kml:name", namespace)
         placemark_name = placemark_name_elem.text.strip() if placemark_name_elem is not None else "Unknown"
 
-        # Skip si le nom indique une cotation
+        # Ignore les cotations
         if "cotation" in placemark_name.lower():
             continue
 
         coordinates_elem = placemark.find(".//kml:coordinates", namespace)
         if coordinates_elem is not None:
             coordinates = coordinates_elem.text.strip()
-            # Utiliser uniquement le dossier parent immédiat comme nom de calque
-            parent_layer = new_path[-1]  # ou new_path[-2] pour avant-dernier si besoin
+            # Utilise le dossier parent du parent (avant-dernier)
+            parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
             if parent_layer not in placemark_dict:
                 placemark_dict[parent_layer] = []
             placemark_dict[parent_layer].append(coordinates)
@@ -45,7 +45,7 @@ def extract_grouped_placemarks(folder_elem, path):
 
     return placemark_dict
 
-# Extraire tous les placemarks groupés
+# Extraction globale
 placemark_groups = {}
 for top_folder in root.findall(".//kml:Document/kml:Folder", namespace):
     grouped = extract_grouped_placemarks(top_folder, [])
@@ -137,7 +137,7 @@ ENDSEC
 0
 EOF
 """
-    output_path = f"/kaggle/working/limoges_{proj_name}.dxf"
+    output_path = f"/kaggle/working/limoges_7{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
