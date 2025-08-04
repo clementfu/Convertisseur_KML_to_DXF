@@ -1,3 +1,4 @@
+#Version qui marche, qui affiche un calque par placemark. Les cotations sont des calques mais n'apparaissent pas dans le fichier DXF. 
 import os
 import re
 import xml.etree.ElementTree as ET
@@ -63,7 +64,139 @@ TABLES
 0
 TABLE
 2
+VPORT
+5
+21
+330
+8
+100
+AcDbSymbolTableRecord
+100
+AcDbViewportTableRecord
+2
+*Active
+70
+0
+10
+0.0
+20
+0.0
+11
+1.0
+21
+1.0
+12
+558231.6831184776
+22
+6530351.842422694
+13
+0.0
+23
+0.0
+14
+0.5
+24
+0.5
+15
+0.5
+25
+0.5
+16
+0.0
+26
+0.0
+36
+1.0
+17
+0.0
+27
+0.0
+37
+0.0
+40
+29313.8120771577
+41
+1.310696095076
+42
+50.0
+43
+0.0
+44
+0.0
+50
+0.0
+51
+0.0
+71
+0
+72
+100
+73
+1
+74
+3
+75
+0
+76
+0
+77
+0
+78
+0
+281
+0
+65
+1
+110
+0.0
+120
+0.0
+130
+0.0
+111
+1.0
+121
+0.0
+131
+0.0
+112
+0.0
+122
+1.0
+132
+0.0
+79
+0
+146
+0.0
+348
+30C
+60
+3
+61
+5
+292
+0
+282
+1
+141
+0.0
+142
+0.0
+63
+250
+421
+3355443
+361
+329
+0
+ENDTAB
+0
+TABLE
+2
 LAYER
+70
+0
 0
 ENDTAB
 0
@@ -79,7 +212,6 @@ SECTION
 2
 ENTITIES
 """
-
     for layer_name_raw, coord_text in placemark_data:
         clean_name = clean_layer_name(layer_name_raw)
         lines = [line.strip() for line in coord_text.split("\n") if line.strip()]
@@ -87,9 +219,7 @@ ENTITIES
             points = [tuple(map(float, c.split(","))) for c in lines]
         except ValueError:
             continue
-
         projected = [transform(lon, lat) for lon, lat, *_ in points]
-
         if len(projected) > 1:
             dxf += f"""0
 LWPOLYLINE
@@ -119,16 +249,12 @@ POINT
 20
 {y}
 """
-
     dxf += """0
 ENDSEC
 0
 EOF
 """
-    output_path = f"/kaggle/working/limoges_{proj_name}.dxf"
+    output_path = f"/kaggle/working/limoges_5{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
-
-dxf_outputs
-
