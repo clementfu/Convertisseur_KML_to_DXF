@@ -13,7 +13,6 @@ namespace = {"kml": "http://www.opengis.net/kml/2.2"}
 def clean_layer_name(name):
     return re.sub(r'[^a-zA-Z0-9_-]', '_', name)
 
-# Extraction des placemarks groupés par dossier parent du dossier parent
 def extract_grouped_placemarks(folder_elem, path):
     placemark_dict = {}
 
@@ -33,15 +32,22 @@ def extract_grouped_placemarks(folder_elem, path):
         if coordinates_elem is not None:
             coordinates = coordinates_elem.text.strip()
 
-            # Détection de "section" ou "divergence" dans le chemin
-            found = False
-            for i in range(len(new_path) - 1):  # on ne va pas jusqu'au dernier
+            # Par défaut, on prend l'avant-dernier dossier
+            parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
+
+            # S'il y a "section" ou "divergence" dans le chemin, on prend le dossier suivant et on ajoute "_LN"
+            for i in range(len(new_path) - 1):  # Évite l'index out of range
                 if any(word in new_path[i].lower() for word in ["section", "divergence"]):
                     parent_layer = new_path[i + 1]
-                    found = True
                     break
-            if not found:
-                parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
+
+            # Fusion gauche/droite → même calque
+            lowered = parent_layer.lower()
+            if "gauche" in lowered or "droite" in lowered:
+                # Supprime "gauche" ou "droite" du nom
+                parent_layer = re.sub(r'(?i)\b(gauche|droite)\b', '', parent_layer).strip()
+                # Optionnel : ajoute "_GD" ou autre suffixe pour indiquer la fusion
+                parent_layer += "_GD"
 
             if parent_layer not in placemark_dict:
                 placemark_dict[parent_layer] = []
@@ -53,6 +59,7 @@ def extract_grouped_placemarks(folder_elem, path):
             placemark_dict.setdefault(key, []).extend(val)
 
     return placemark_dict
+
 
 
 # Extraction globale
@@ -147,7 +154,7 @@ ENDSEC
 0
 EOF
 """
-    output_path = f"/kaggle/working/limoges_1{proj_name}.dxf"
+    output_path = f"/kaggle/working/lim_1{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
