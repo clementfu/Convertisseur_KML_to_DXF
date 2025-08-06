@@ -32,35 +32,36 @@ def extract_grouped_placemarks(folder_elem, path):
         if coordinates_elem is not None:
             coordinates = coordinates_elem.text.strip()
 
-            # Par défaut, on prend l'avant-dernier dossier
-            parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
+            # Nom de calque basé sur le chemin
+            if any(re.search(r"(appui|horizontale|conique)", part, re.IGNORECASE) for part in new_path):
+                parent_layer = new_path[-1] if len(new_path) >= 1 else "SansNom"
+            else:
+                parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
 
-            # S'il y a "section" ou "divergence" dans le chemin, on prend le dossier suivant et on ajoute "_LN"
-            for i in range(len(new_path) - 1):  # Évite l'index out of range
+
+            # S'il y a "section" ou "divergence", on prend le dossier suivant
+            for i in range(len(new_path) - 1):
                 if any(word in new_path[i].lower() for word in ["section", "divergence"]):
                     parent_layer = new_path[i + 1]
                     break
 
-            # Fusion gauche/droite → même calque
+            # Fusion gauche/droite
             lowered = parent_layer.lower()
             if "gauche" in lowered or "droite" in lowered:
-                # Supprime "gauche" ou "droite" du nom
                 parent_layer = re.sub(r'(?i)\b(gauche|droite)\b', '', parent_layer).strip()
-                # Optionnel : ajoute "_GD" ou autre suffixe pour indiquer la fusion
                 parent_layer += "_GD"
 
             if parent_layer not in placemark_dict:
                 placemark_dict[parent_layer] = []
             placemark_dict[parent_layer].append(coordinates)
 
+    # Recursion sur les sous-dossiers
     for subfolder in folder_elem.findall("kml:Folder", namespace):
         sub_dict = extract_grouped_placemarks(subfolder, new_path)
         for key, val in sub_dict.items():
             placemark_dict.setdefault(key, []).extend(val)
 
     return placemark_dict
-
-
 
 # Extraction globale
 placemark_groups = {}
@@ -154,7 +155,7 @@ ENDSEC
 0
 EOF
 """
-    output_path = f"/kaggle/working/lim_1{proj_name}.dxf"
+    output_path = f"/kaggle/working/lim_7{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
