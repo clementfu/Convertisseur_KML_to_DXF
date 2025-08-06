@@ -32,8 +32,17 @@ def extract_grouped_placemarks(folder_elem, path):
         coordinates_elem = placemark.find(".//kml:coordinates", namespace)
         if coordinates_elem is not None:
             coordinates = coordinates_elem.text.strip()
-            # Utilise le dossier parent du parent (avant-dernier)
-            parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
+
+            # Détection de "section" ou "divergence" dans le chemin
+            found = False
+            for i in range(len(new_path) - 1):  # on ne va pas jusqu'au dernier
+                if any(word in new_path[i].lower() for word in ["section", "divergence"]):
+                    parent_layer = new_path[i + 1]
+                    found = True
+                    break
+            if not found:
+                parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
+
             if parent_layer not in placemark_dict:
                 placemark_dict[parent_layer] = []
             placemark_dict[parent_layer].append(coordinates)
@@ -44,6 +53,7 @@ def extract_grouped_placemarks(folder_elem, path):
             placemark_dict.setdefault(key, []).extend(val)
 
     return placemark_dict
+
 
 # Extraction globale
 placemark_groups = {}
@@ -137,7 +147,7 @@ ENDSEC
 0
 EOF
 """
-    output_path = f"/kaggle/working/limoges_{proj_name}.dxf"
+    output_path = f"/kaggle/working/limoges_1{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
