@@ -41,7 +41,7 @@ def extract_grouped_placemarks(folder_elem, path):
 
             # S'il y a "section" ou "divergence", on prend le dossier suivant
             for i in range(len(new_path) - 1):
-                if any(word in new_path[i].lower() for word in ["section", "divergence"]):
+                if any(word in new_path[i].lower() for word in ["section", "divergence","rac"]):
                     parent_layer = new_path[i + 1]
                     break
 
@@ -54,6 +54,11 @@ def extract_grouped_placemarks(folder_elem, path):
             if parent_layer not in placemark_dict:
                 placemark_dict[parent_layer] = []
             placemark_dict[parent_layer].append(coordinates)
+                        
+            # Si "OFZ" est présent dans le chemin, et pas déjà dans le calque, préfixe le nom du calque
+            if any("OFZ" in part.upper() for part in new_path) and "OFZ" not in parent_layer.upper():
+                parent_layer = "OFZ_" + parent_layer
+
 
     # Recursion sur les sous-dossiers
     for subfolder in folder_elem.findall("kml:Folder", namespace):
