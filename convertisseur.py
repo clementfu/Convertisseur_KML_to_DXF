@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from pyproj import Transformer
 
 # Charger le fichier KML
-kml_file_path = "/kaggle/input/test-limoges/LIMOGESBELLEGARDE-LFBL-03-21principale.kml"
+kml_file_path = "/kaggle/input/marseille/MARSEILLEPROVENCE-LFML-13L-31Rprincipale.kml"
 tree = ET.parse(kml_file_path)
 root = tree.getroot()
 namespace = {"kml": "http://www.opengis.net/kml/2.2"}
@@ -41,7 +41,7 @@ def extract_grouped_placemarks(folder_elem, path):
 
             # S'il y a "section" ou "divergence", on prend le dossier suivant
             for i in range(len(new_path) - 1):
-                if any(word in new_path[i].lower() for word in ["section", "divergence","rac"]):
+                if any(word in new_path[i].lower() for word in ["section", "divergence","rac","lat-"]):
                     parent_layer = new_path[i + 1]
                     break
 
@@ -56,7 +56,7 @@ def extract_grouped_placemarks(folder_elem, path):
             placemark_dict[parent_layer].append(coordinates)
                         
             # Si "OFZ" est présent dans le chemin, et pas déjà dans le calque, préfixe le nom du calque
-            if any("OFZ" in part.upper() for part in new_path) and "OFZ" not in parent_layer.upper():
+            if any("OFZ" in part.upper() for part in new_path):
                 parent_layer = "OFZ_" + parent_layer
 
 
@@ -160,7 +160,7 @@ ENDSEC
 0
 EOF
 """
-    output_path = f"/kaggle/working/lim_7{proj_name}.dxf"
+    output_path = f"/kaggle/working/mars_8{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
