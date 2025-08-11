@@ -35,29 +35,28 @@ def extract_grouped_placemarks(folder_elem, path):
         if "cotation" in placemark_name.lower():
             continue
 
-        # Recherche robuste des coordonnées (peu importe la structure interne)
+        # Recherche robuste des coordonnées
         coord_elem = placemark.find(".//kml:coordinates", namespace)
         if coord_elem is None:
-            # si aucun, tenter sans namespace (au cas où)
             coord_elem = placemark.find(".//coordinates")
         if coord_elem is None:
             continue
 
         coordinates = coord_elem.text.strip()
 
-        # Nom de calque basé sur le chemin : si appui/horizontale/conique présent => parent courant, sinon grand-parent
+        # Règle de nommage du parent
         if any(re.search(r"(appui|horizontale|conique|conical|horizontal|strip|clearway)", part, re.IGNORECASE) for part in new_path):
-            parent_layer = new_path[-1] if len(new_path) >= 1 else "SansNom"
+            parent_layer = new_path[-1] if len(new_path) >= 1 else "SansNom"           
         else:
             parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
 
-        # S'il y a "section", "divergence", "rac" ou "lat-" dans la hiérarchie -> prendre le dossier suivant (fils)
+        # Cas section/divergence/rac/lat-
         for i in range(len(new_path) - 1):
             if any(word in new_path[i].lower() for word in ["section", "divergence", "rac", "lat-"]):
                 parent_layer = new_path[i + 1]
                 break
-                
-        # Ajout préfixe OLD ou NEW si trouvé dans l'arborescence
+
+        # Préfixes OLD / NEW
         if any("OLDOLS" in part.upper() for part in new_path):
             parent_layer = "OLD_" + parent_layer
         elif any("NEWOLS" in part.upper() for part in new_path):
@@ -68,20 +67,13 @@ def extract_grouped_placemarks(folder_elem, path):
         if "gauche" in lowered or "droite" in lowered:
             parent_layer = re.sub(r'(?i)\b(gauche|droite)\b', '', parent_layer).strip()
             parent_layer += "_GD"
-
-        # Fusion gauche/droite
-        lowered = parent_layer.lower()
         if "left" in lowered or "right" in lowered:
             parent_layer = re.sub(r'(?i)\b(left|right)\b', '', parent_layer).strip()
             parent_layer += "_LR"
 
-        # Préfixe OFZ si présent dans le chemin et pas déjà dans le nom de calque
+        # Préfixe OFZ si présent
         if any("OFZ" in part.upper() for part in new_path) and "OFZ" not in parent_layer.upper():
             parent_layer = "OFZ_" + parent_layer
-
-        # Si parent_layer contient "Appui" (ou si dossier courant contient Appui) : règle spéciale:
-        # (exemple demandé précédemment: prendre tous les dossiers fils, ici on garde la logique de nommage)
-        # ... tu peux adapter ici si besoin.
 
         placemark_dict.setdefault(parent_layer, []).append(coordinates)
 
@@ -93,8 +85,7 @@ def extract_grouped_placemarks(folder_elem, path):
 
     return placemark_dict
 
-# Extraction globale : certains KML ne placent pas les Folder sous Document de façon standard.
-# On va chercher les Folder sous Document puis, à défaut, les Folder direct sous root.
+# Extraction globale
 placemark_groups = {}
 top_folders = root.findall(".//kml:Document/kml:Folder", namespace)
 if not top_folders:
@@ -104,6 +95,20 @@ for top_folder in top_folders:
     grouped = extract_grouped_placemarks(top_folder, [])
     for key, val in grouped.items():
         placemark_groups.setdefault(key, []).extend(val)
+
+# Renommage final des calques
+final_layer_rename = {
+    "AERODROME": "Runway",
+    "NEW_NEWOLS": "NEW_Runway_Surface"
+    # ajouter d'autres renoms si besoin
+}
+
+renamed_groups = {}
+for layer_name, coords in placemark_groups.items():
+    new_name = final_layer_rename.get(layer_name, layer_name)
+    renamed_groups[new_name] = coords
+
+placemark_groups = renamed_groups
 
 # Transformations (projections)
 transformers = {
@@ -190,7 +195,7 @@ ENDSEC
 0
 EOF
 """
-    output_path = f"/kaggle/working/Marseille_6_{proj_name}.dxf"
+    output_path = f"/kaggle/working/Marseille_9_{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
