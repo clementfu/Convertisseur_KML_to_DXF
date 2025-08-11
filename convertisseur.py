@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from pyproj import Transformer
 
 # Charger le fichier KML
-kml_file_path = "/kaggle/input/marseille/MARSEILLEPROVENCE-LFML-13L-31Rprincipale.kml"
+kml_file_path = "/kaggle/input/visuols-mars/VISUOLS_Marseille.kml"
 tree = ET.parse(kml_file_path)
 root = tree.getroot()
 
@@ -46,7 +46,7 @@ def extract_grouped_placemarks(folder_elem, path):
         coordinates = coord_elem.text.strip()
 
         # Nom de calque basé sur le chemin : si appui/horizontale/conique présent => parent courant, sinon grand-parent
-        if any(re.search(r"(appui|horizontale|conique)", part, re.IGNORECASE) for part in new_path):
+        if any(re.search(r"(appui|horizontale|conique|conical|horizontal|strip|clearway)", part, re.IGNORECASE) for part in new_path):
             parent_layer = new_path[-1] if len(new_path) >= 1 else "SansNom"
         else:
             parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
@@ -56,12 +56,24 @@ def extract_grouped_placemarks(folder_elem, path):
             if any(word in new_path[i].lower() for word in ["section", "divergence", "rac", "lat-"]):
                 parent_layer = new_path[i + 1]
                 break
+                
+        # Ajout préfixe OLD ou NEW si trouvé dans l'arborescence
+        if any("OLDOLS" in part.upper() for part in new_path):
+            parent_layer = "OLD_" + parent_layer
+        elif any("NEWOLS" in part.upper() for part in new_path):
+            parent_layer = "NEW_" + parent_layer
 
         # Fusion gauche/droite
         lowered = parent_layer.lower()
         if "gauche" in lowered or "droite" in lowered:
             parent_layer = re.sub(r'(?i)\b(gauche|droite)\b', '', parent_layer).strip()
             parent_layer += "_GD"
+
+        # Fusion gauche/droite
+        lowered = parent_layer.lower()
+        if "left" in lowered or "right" in lowered:
+            parent_layer = re.sub(r'(?i)\b(left|right)\b', '', parent_layer).strip()
+            parent_layer += "_LR"
 
         # Préfixe OFZ si présent dans le chemin et pas déjà dans le nom de calque
         if any("OFZ" in part.upper() for part in new_path) and "OFZ" not in parent_layer.upper():
@@ -178,7 +190,7 @@ ENDSEC
 0
 EOF
 """
-    output_path = f"/kaggle/working/Marseille_2_{proj_name}.dxf"
+    output_path = f"/kaggle/working/Marseille_6_{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
