@@ -90,6 +90,7 @@ def extract_grouped_placemarks(folder_elem, path):
 
         # Fusion gauche/droite
         lowered = parent_layer.lower()
+        if "sit" not in lowered and "sl" not in lowered:
             if "gauche" in lowered or "droite" in lowered:
                 parent_layer = re.sub(r'(?i)\b(gauche|droite)\b', '', parent_layer).strip() + "_GD"
             if "left" in lowered or "right" in lowered:
@@ -201,7 +202,7 @@ LWPOLYLINE
                 dxf += add_text_entity(x, y, placemark_name, clean_name)
 
     dxf += "0\nENDSEC\n0\nEOF\n"
-    output_path = f"/kaggle/working/MarsPEGASE5_{proj_name}.dxf"
+    output_path = f"/kaggle/working/MarsPEGASE7_{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
