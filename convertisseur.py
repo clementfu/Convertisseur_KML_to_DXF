@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from pyproj import Transformer
 
 # Charger le fichier KML
-kml_file_path = "/kaggle/input/test-limoges/LIMOGESBELLEGARDE-LFBL-03-21principale.kml"
+kml_file_path = "/kaggle/input/trouee-courbe/LE CREUSOT CENTRE HOSPITALIER HOTEL DIEU-1.kml"
 tree = ET.parse(kml_file_path)
 root = tree.getroot()
 
@@ -61,7 +61,7 @@ def extract_grouped_placemarks(folder_elem, path):
         # Règle de nommage du parent
         if any(re.search(r"(appui|horizontale|conique|conical|horizontal|strip|clearway|stopway|fato|sécurité|ensemble)", part, re.IGNORECASE) for part in new_path):
             parent_layer = new_path[-1] if len(new_path) >= 1 else "SansNom"
-        elif any(re.search(r"phase\s+de\s+recul\s+[A-Z0-9]{2}", part, re.IGNORECASE) for part in new_path):
+        elif any(re.search(r"phase\s+de\s+recul\s+[A-Z0-9]{2}", part, re.IGNORECASE) for part in new_path): #pour séparer les phases de recul s'il y en a plusieurs
             parent_layer = new_path[-1] if len(new_path) >= 1 else "SansNom"
         else:
             parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
@@ -71,6 +71,15 @@ def extract_grouped_placemarks(folder_elem, path):
             if any(word in new_path[i].lower() for word in ["section", "divergence", "rac", "lat-"]):
                 parent_layer = new_path[i + 1]
                 break
+
+        # Séparation Atterrissage / Décollage pour trouée courbe
+        lowered_path = " ".join(new_path).lower() + " " + placemark_name.lower()
+        if "courbe" in lowered_path:
+            if "atterrissage" in lowered_path:
+                parent_layer += "_AT"
+            elif "décollage" in lowered_path or "decollage" in lowered_path:
+                parent_layer += "_DEC"
+
 
         # Préfixes OLD / NEW
         if any("OLDOLS" in part.upper().replace(" ", "") for part in new_path):
@@ -191,12 +200,15 @@ LWPOLYLINE
                 dxf += add_text_entity(x, y, placemark_name, clean_name)
 
     dxf += "0\nENDSEC\n0\nEOF\n"
-    output_path = f"/kaggle/working/lim7_{proj_name}.dxf"
+    output_path = f"/kaggle/working/courbe6_{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
 
-# debug: afficher quelques calques et exemples
+
+
+
+#Pour tester quelques calques
 print("Nombre de calques :", len(placemark_groups))
 for i, (layer, items) in enumerate(placemark_groups.items()):
     print(f"Calque {i+1}: {layer} -> {len(items)} entités (exemples)")
