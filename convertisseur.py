@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from pyproj import Transformer
 
 # Charger le fichier KML
-kml_file_path = "/kaggle/input/trouee-courbe/LE CREUSOT CENTRE HOSPITALIER HOTEL DIEU-1.kml"
+kml_file_path = "/kaggle/input/pegase-marseille/MARSEILLE.kml"
 tree = ET.parse(kml_file_path)
 root = tree.getroot()
 
@@ -17,10 +17,10 @@ namespace = {"kml": ns_uri}
 
 # Nettoyage des noms de calque
 def clean_layer_name(name):
-    return re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+    return re.sub(r'[^a-zA-Z0-9_-]', '_', name) #Mettre un autre filtrage sur les "é" et les "_"
 
 # Fonction pour créer un texte DXF
-def add_text_entity(x, y, text, layer_name, height=2.5):
+def add_text_entity(x, y, text, layer_name, height=2.5,z=0.0): #tester mettre "text" à la place de z
     return f"""0
 TEXT
 8
@@ -30,7 +30,7 @@ TEXT
 20
 {y}
 30
-0.0
+{z}
 40
 {height}
 1
@@ -66,6 +66,7 @@ def extract_grouped_placemarks(folder_elem, path):
         else:
             parent_layer = new_path[-2] if len(new_path) >= 2 else new_path[-1]
 
+        
         # Cas section/divergence/rac/lat-
         for i in range(len(new_path) - 1):
             if any(word in new_path[i].lower() for word in ["section", "divergence", "rac", "lat-"]):
@@ -89,16 +90,16 @@ def extract_grouped_placemarks(folder_elem, path):
 
         # Fusion gauche/droite
         lowered = parent_layer.lower()
-        if "gauche" in lowered or "droite" in lowered:
-            parent_layer = re.sub(r'(?i)\b(gauche|droite)\b', '', parent_layer).strip() + "_GD"
-        if "left" in lowered or "right" in lowered:
-            parent_layer = re.sub(r'(?i)\b(left|right)\b', '', parent_layer).strip() + "_LR"
+            if "gauche" in lowered or "droite" in lowered:
+                parent_layer = re.sub(r'(?i)\b(gauche|droite)\b', '', parent_layer).strip() + "_GD"
+            if "left" in lowered or "right" in lowered:
+                parent_layer = re.sub(r'(?i)\b(left|right)\b', '', parent_layer).strip() + "_LR"
 
         # Préfixe OFZ si présent
         if any("OFZ" in part.upper() for part in new_path) and "OFZ" not in parent_layer.upper():
             parent_layer = "OFZ_" + parent_layer
 
-        # 🔹 Stocker coordonnées + nom
+        # Stocker coordonnées + nom
         placemark_dict.setdefault(parent_layer, []).append((coordinates, placemark_name))
 
     # Recursion sur les sous-dossiers
@@ -116,6 +117,7 @@ for top_folder in top_folders:
     grouped = extract_grouped_placemarks(top_folder, [])
     for key, val in grouped.items():
         placemark_groups.setdefault(key, []).extend(val)
+
 
 # Renommage final
 final_layer_rename = {
@@ -175,7 +177,6 @@ ENTITIES
                 points = [tuple(map(float, c.split(","))) for c in lines]
             except ValueError:
                 continue
-
             projected = [transform(lon, lat) for lon, lat, *_ in points]
 
             if len(projected) > 1:  # Polyligne
@@ -200,7 +201,7 @@ LWPOLYLINE
                 dxf += add_text_entity(x, y, placemark_name, clean_name)
 
     dxf += "0\nENDSEC\n0\nEOF\n"
-    output_path = f"/kaggle/working/courbe6_{proj_name}.dxf"
+    output_path = f"/kaggle/working/MarsPEGASE5_{proj_name}.dxf"
     with open(output_path, "w") as f:
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
@@ -216,3 +217,4 @@ for i, (layer, items) in enumerate(placemark_groups.items()):
         print("  ", ex[:2])   # affiche (coord_text, placemark_name) si stocké ainsi
     if i >= 4:
         break
+        
