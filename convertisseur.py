@@ -9,6 +9,7 @@ tree = ET.parse(kml_file_path)
 root = tree.getroot()
 
 # Détecter dynamiquement le namespace KML utilisé
+# détecte automatiquement l’URI du namespace utilisé dans le fichier KML (sinon prend le standard OGC)
 if root.tag.startswith("{"):
     ns_uri = root.tag.split("}")[0].strip("{")
 else:
@@ -16,10 +17,16 @@ else:
 namespace = {"kml": ns_uri}
 
 # Nettoyage des noms de calque
+#Entrée : name (chaîne de caractères → nom de dossier/placemark)
+#Sortie : name nettoyé (string)
 def clean_layer_name(name):
     return re.sub(r'[^a-zA-Z0-9_-]', '_', name) #Mettre un autre filtrage sur les "é" et les "_"
 
 # Fonction pour créer un texte DXF
+# Entrée : x, y, z → coordonnées numériques (float); text → contenu texte (string); layer_name → nom de calque (string)
+# Action : fabrique une entité DXF de type TEXT à placer sur le dessin.
+#Sortie : string au format DXF décrivant le texte
+
 def add_text_entity(x, y, text, layer_name, height=2.5,z=0.0): #tester mettre "text" à la place de z
     return f"""0
 TEXT
@@ -37,6 +44,21 @@ TEXT
 {text}
 """
 
+
+#Entrée : folder_elem → un élément XML <Folder> (objet Element); path → liste des noms de dossiers (list[str]) représentant le chemin hiérarchique.
+#Action :
+#    Parcourt les <Placemark> dans le dossier.
+#    Récupère leurs coordonnées (<coordinates>).
+#    Détermine un nom de calque (logique basée sur règles métier : “courbe”, “gauche/droite”, “OLD/NEW”, etc.).
+#    Stocke les couples (coordonnées, nom du placemark) regroupés par calque.
+#    Appelle récursivement la fonction pour descendre dans les sous-dossiers
+
+#Sortie : dictionnaire Python dict[str, list[tuple[str, str]]]
+#    clé = nom du calque,
+#    valeur = liste de tuples (coord_text, placemark_name)
+
+
+
 def extract_grouped_placemarks(folder_elem, path):
     placemark_dict = {}
 
@@ -49,14 +71,22 @@ def extract_grouped_placemarks(folder_elem, path):
         placemark_name_elem = placemark.find("kml:name", namespace)
         placemark_name = placemark_name_elem.text.strip() if placemark_name_elem is not None else "Unknown"
 
-        # Recherche robuste des coordonnées
+        # Recherche robuste des coordonnées d'un Placemark
+        # Étape 1 : on cherche l'élément <coordinates> avec le namespace KML
         coord_elem = placemark.find(".//kml:coordinates", namespace)
+
+        # Étape 2 : si non trouvé, on essaie sans namespace (<coordinates>)
         if coord_elem is None:
             coord_elem = placemark.find(".//coordinates")
+
+        # Étape 3 : si toujours rien, on ignore ce Placemark et on passe au suivant
         if coord_elem is None:
             continue
 
+        # Étape 4 : si trouvé, on récupère le texte brut des coordonnées
+        # (ex: "5.372,43.295,0 5.373,43.296,0") et on supprime les espaces inutiles
         coordinates = coord_elem.text.strip()
+
 
         # Règle de nommage du parent
         if any(re.search(r"(appui|horizontale|conique|conical|horizontal|strip|clearway|stopway|fato|sécurité|ensemble)", part, re.IGNORECASE) for part in new_path):
@@ -104,20 +134,44 @@ def extract_grouped_placemarks(folder_elem, path):
         placemark_dict.setdefault(parent_layer, []).append((coordinates, placemark_name))
 
     # Recursion sur les sous-dossiers
+    # --- RÉCURRENCE LOCALE ---
+    # Ici, on est déjà dans un dossier (folder_elem).
+    # On parcourt tous ses sous-dossiers ("kml:Folder") et on appelle
+    # à nouveau extract_grouped_placemarks de manière récursive.
+    # Cela permet de descendre dans l'arborescence jusqu'au dernier niveau,
+    # et de collecter tous les Placemark même s'ils sont enfouis
+    # dans plusieurs sous-dossiers imbriqués.
+    
     for subfolder in folder_elem.findall("kml:Folder", namespace):
         sub_dict = extract_grouped_placemarks(subfolder, new_path)
         for key, val in sub_dict.items():
-            placemark_dict.setdefault(key, []).extend(val)
+            placemark_dict.setdefault(key, []).extend(val) # .extend() : ajoute les éléments d’une autre liste à la fin d’une liste existante
 
     return placemark_dict
 
 # Extraction
+# --- POINT D’ENTRÉE GLOBAL ---
+# Ici, on est au niveau racine du fichier KML (root).
+# On cherche les dossiers principaux directement sous <Document>
+# (ou, si absents, directement sous la racine).
+# Pour chaque "top_folder", on appelle une première fois
+# extract_grouped_placemarks : c’est ce qui démarre l’analyse.
+# Ensuite, grâce à la récursion (bloc précédent), 
+# la fonction descend automatiquement dans tous les sous-dossiers.
+
 placemark_groups = {}
 top_folders = root.findall(".//kml:Document/kml:Folder", namespace) or root.findall(".//kml:Folder", namespace)
 for top_folder in top_folders:
     grouped = extract_grouped_placemarks(top_folder, [])
     for key, val in grouped.items():
-        placemark_groups.setdefault(key, []).extend(val)
+        placemark_groups.setdefault(key, []).extend(val) #Sortie : placemark_groups (dict avec tous les placemarks classés par calque)
+
+#En résumé :
+
+ #   Sans le premier passage, on ne descendrait pas dans les sous-dossiers.
+
+  #  Sans le deuxième passage, on ne démarrerait jamais l’analyse depuis la racine.
+
 
 
 # Renommage final
@@ -135,7 +189,7 @@ placemark_groups = renamed_groups
 transformers = {
     "WGS84": lambda lon, lat: (lon, lat),
     "Lambert93": Transformer.from_crs("EPSG:4326", "EPSG:2154", always_xy=True).transform
-}
+} # Sortie : dict de fonctions de transformation {nom: fonction(lon,lat)->(x,y)}
 
 # Génération DXF
 dxf_outputs = {}
@@ -207,6 +261,14 @@ LWPOLYLINE
         f.write(dxf)
     dxf_outputs[proj_name] = output_path
 
+#Action :
+    #Pour chaque projection :
+        #Crée un squelette de fichier DXF.
+        #Parcourt chaque calque et placemark :
+            #Si plusieurs points → crée une polyligne DXF.
+            #Si un seul point → crée un point + texte DXF.
+        #Ajoute les entités DXF au fichier.
+        #Sauvegarde le DXF sur disque.
 
 
 
